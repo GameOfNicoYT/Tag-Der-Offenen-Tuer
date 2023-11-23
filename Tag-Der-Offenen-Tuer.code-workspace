@@ -1,0 +1,16 @@
+{
+  "folders": [
+	{
+		"path": "."
+	},
+	{
+		"name": "ESP_Tag_d_Offenen_Tuer",
+		"path": "ESP_Tag_d_Offenen_Tuer"
+	},
+	{
+		"name": "MEGA_Tag_d_Offenen_Tuer",
+		"path": "MEGA_Tag_d_Offenen_Tuer"
+	}
+],
+  "settings": {}
+}

@@ -1,349 +1,377 @@
-#include <ArduinoJson.h>
+/*
+ Copyright (c) 2023 Nico Proyer, nicoproyer.at
+ Permission is hereby granted, free of charge,
+ to any person obtaining a copy of this software
+ and associated documentation files (the “Software”),
+ to deal in the Software without restriction, including
+ without limitation the rights to use, copy,
+ modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit
+ persons to whom the Software is furnished to do so,
+ subject to the following conditions:The above copyright
+ notice and this permission notice shall be included
+ in all copies or substantial portions of the Software.
+ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF
+ ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+ SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ You should have received a copy of the MIT copyright license
+ along with this program.  If not, see <https://opensource.org/license/mit/>.
+
+
+ Second Copyright holder:
+ Copyright (C) 2020 chester4444@wolke7.net
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <WiFi.h>
-#include <WebSocketsServer.h>
+#include <mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
+#include <LittleFS.h>
+#include <AsyncTCP.h>
+#include "ESPAsyncWebServer.h"
+#include "WebSocketService.h"
+#include "esp_wpa2.h"
+#include "credentials.h"
 
-// Replace with your network credentials
-const char *ssid = "ESP_Sensor_Board";
-const char *password = "HTL_TDOT_2023!";
+#define LED_STATUS 4
+#define OTA_NAME "webserver" // defined in platformio.ini
 
-// Set web server port number to 80
-WebSocketsServer webSocket = WebSocketsServer(81);
-WiFiServer server(80);
+AsyncWebServer webServer(80);
+WebSocketService webSocketService;
 
-// Variable to store the HTTP request
-String header;
+uint8_t wifiConnectCounter = 0;
 
-// Auxiliar variables to store the current output state
-String output26State = "off";
-String output27State = "off";
+bool ConnectWifi(void)
+{
+  int i = 0;
+  bool isWifiValid = false;
 
-// Assign output variables to GPIO pins
-const int output26 = 26;
-const int output27 = 27;
+  Serial.println("starting scan");
+  // scan for nearby networks:
+  int numSsid = WiFi.scanNetworks();
 
-// Current time
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0;
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
+  Serial.print("scanning WIFI, found ");
+  Serial.print(numSsid);
+  Serial.println(" available access points:");
+
+  if (numSsid == -1)
+  {
+    Serial.println("Couldn't get a wifi connection");
+    return false;
+  }
+
+  for (int i = 0; i < numSsid; i++)
+  {
+    Serial.print(i + 1);
+    Serial.print(". ");
+    Serial.print(WiFi.SSID(i));
+    Serial.print("  ");
+    Serial.println(WiFi.RSSI(i));
+  }
+
+  // search for given credentials
+  for (CREDENTIAL credential : credentials)
+  {
+    for (int j = 0; j < numSsid; ++j)
+    {
+      if (strcmp(WiFi.SSID(j).c_str(), credential.ssid) == 0)
+      {
+        Serial.print("credentials found for: ");
+        Serial.println(credential.ssid);
+        currentWifi = credential;
+        isWifiValid = true;
+      }
+    }
+  }
+
+  if (!isWifiValid)
+  {
+    Serial.println("no matching credentials");
+    return false;
+  }
+
+  // try to connect
+  Serial.println(WiFi.macAddress());
+
+  if (strlen(currentWifi.username))
+  {
+    // username not empty -> WPA2  magic starts here
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_STA);
+    esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)currentWifi.username, strlen(currentWifi.username));
+    esp_wifi_sta_wpa2_ent_set_username((uint8_t *)currentWifi.username, strlen(currentWifi.username));
+    esp_wifi_sta_wpa2_ent_set_password((uint8_t *)currentWifi.password, strlen(currentWifi.password));
+    // esp_wpa2_config_t config = WPA2_CONFIG_INIT_DEFAULT();
+    esp_wifi_sta_wpa2_ent_enable();
+    //  WPA2 enterprise magic ends here
+
+    WiFi.begin(currentWifi.ssid);
+  }
+  else
+  {
+    // try to connect WPA
+    WiFi.begin(currentWifi.ssid, currentWifi.password);
+    WiFi.setHostname(OTA_NAME);
+    Serial.println("");
+    Serial.print("Connecting to WiFi ");
+    Serial.println(currentWifi.ssid);
+  }
+
+  i = 0;
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    digitalWrite(LED_STATUS, LOW);
+    delay(300);
+    Serial.print(".");
+    digitalWrite(LED_STATUS, HIGH);
+    delay(300);
+    if (i++ > 50)
+    {
+      // giving up
+      ESP.restart();
+      return false;
+    }
+  }
+  return true;
+}
+
+void setupOTA()
+{
+  // Port defaults to 8266
+  // ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname(OTA_NAME);
+
+  // No authentication by default
+  // ArduinoOTA.setPassword((const char *)"123");
+
+  ArduinoOTA.onStart([]()
+                     {
+    
+    Serial.print(F("Start updating "));
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      Serial.println(F("sketch"));
+    } else { // U_FS
+      Serial.println(F("filesystem"));
+    }
+
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    LittleFS.end(); });
+
+  ArduinoOTA.onEnd([]()
+                   { Serial.println(F("\nEnd")); });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+                        {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    digitalWrite(LED_STATUS, !digitalRead(LED_STATUS)); });
+
+  ArduinoOTA.onError([](ota_error_t error)
+                     {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println(F("Auth Failed"));
+    else if (error == OTA_BEGIN_ERROR) Serial.println(F("Begin Failed"));
+    else if (error == OTA_CONNECT_ERROR) Serial.println(F("Connect Failed"));
+    else if (error == OTA_RECEIVE_ERROR) Serial.println(F("Receive Failed"));
+    else if (error == OTA_END_ERROR) Serial.println(F("End Failed")); });
+
+  ArduinoOTA.begin();
+}
+
+void setupFilesystem()
+{
+  if (LittleFS.begin())
+  {
+    Serial.println("FileSystem started");
+  }
+  else
+  {
+    Serial.println("formatting FileSystem ...");
+    LittleFS.format();
+    ESP.restart();
+  }
+}
 
 void setup()
 {
+  // pinMode(LED_STATUS, OUTPUT);
+
   Serial.begin(9600);
-  Serial.println();
-  Serial.println();
-  // Initialize the output variables as outputs
-  pinMode(output26, OUTPUT);
-  pinMode(output27, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output26, LOW);
-  digitalWrite(output27, LOW);
+  Serial2.begin(115200);
 
-  // Connect to Wi-Fi network with SSID and password
-  Serial.print("Creating Network: ");
-  Serial.println(ssid);
-
-  WiFi.softAP(ssid, password);
-
-  Serial.println("Zugangspunkt gestartet");
-  Serial.print("IP-Adresse: ");
-  Serial.println(WiFi.softAPIP());
-
-  server.begin();
+  Serial.println("\nStarting WebServer - (" OTA_NAME ")");
+  setupFilesystem();
 }
 
+enum ControlStateType
+{
+  StateInit,
+  StateNotConnected,
+  StateWifiSetup,
+  StateWifiConnecting,
+  StateSetupWebServer,
+  StateMqttConnect,
+  StateConnected,
+  StateOperating,
+  StateIdle
+};
+ControlStateType ControlState = StateInit;
 
 void loop()
 {
-  WiFiClient client = server.available(); // Listen for incoming clients
+  // Read the String until the JSON is fully sent;
+  StaticJsonDocument<200> doc;
+  readData(&doc);
 
-  if (Serial.available())
+  switch (ControlState)
   {
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, Serial);
+  case StateInit:
 
-    if (!error)
+    // Serial.println("StateInit:");
+    //    WiFi.mode(WIFI_STA);
+
+    ControlState = StateNotConnected;
+    break;
+
+  case StateNotConnected:
+    // Serial.println("StateNotConnected:");
+
+    wifiConnectCounter = 0;
+    ControlState = StateWifiSetup;
+    break;
+
+  case StateWifiSetup:
+    Serial.println(F("StateWifiSetup:"));
+
+    ControlState = StateWifiConnecting;
+    break;
+
+  case StateWifiConnecting:
+    // Serial.println(F("StateMqttConnecting:"));
+    ConnectWifi();
+
+    if (WiFi.status() == WL_CONNECTED)
     {
-      const char *sensor = doc["sensor"]; // GETSTRING
-      long time = doc["time"];            // GETNUMBER
+      Serial.println("");
+      Serial.print("Connected to ");
+      Serial.println(WiFi.SSID());
+      Serial.print("IP address: ");
+      Serial.println(WiFi.localIP());
+      Serial.println();
+      delay(1000);
+
+      // WiFi.softAPdisconnect (true);
+      Serial.println(WiFi.SSID());
+      Serial.println(WiFi.localIP());
+      /*
+              if (!MDNS.begin(OTA_NAME))
+              {
+                Serial.println(F("mDNS init failed"));
+              }
+      */
+      setupOTA();
+
+      ControlState = StateSetupWebServer;
     }
-  }
-
-  if (client)
-  { // If a new client connects,
-    currentTime = millis();
-    previousTime = currentTime;
-    Serial.println("New Client."); // print a message out in the serial port
-    String currentLine = "";       // make a String to hold incoming data from the client
-    while (client.connected() && currentTime - previousTime <= timeoutTime)
-    { // loop while the client's connected
-      currentTime = millis();
-      if (client.available())
-      {                         // if there's bytes to read from the client,
-        char c = client.read(); // read a byte, then
-        Serial.write(c);        // print it out the serial monitor
-        header += c;
-        if (c == '\n')
-        { // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0)
-          {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html; charset=UTF-8");
-            client.println("Connection: close");
-            client.println();
-
-            // turns the GPIOs on and off
-            if (header.indexOf("GET /formatedData") >= 0)
-            {
-              Serial.println("GPIO 26 on");
-              output26State = "on";
-              digitalWrite(output26, HIGH);
-            }
-            else if (header.indexOf("GET /rawData") >= 0)
-            {
-              Serial.println("GPIO 27 on");
-              output27State = "on";
-              digitalWrite(output27, HIGH);
-            }
-            else if (header.indexOf("GET /snakeGame") >= 0)
-            {
-              // SNAKE GAME
-
-              client.println("<style>");
-              client.println("body {");
-              client.println("overflow: hidden;");
-              client.println("display: flex;");
-              client.println("justify-content: center;");
-              client.println("align-items: center;");
-              client.println("flex-direction: column;");
-              client.println("height: 100vh;");
-              client.println("background-color: #f0f0f0;");
-              client.println("}");
-              client.println("");
-              client.println("canvas {");
-              client.println("border: 1px solid black;");
-              client.println("}");
-              client.println("</style>");
-              client.println("");
-              client.println("<body>");
-              client.println("<p id=\"currentScore\"></p>");
-              client.println("<p id=\"highScore\"></p>");
-              client.println("<canvas id=\"gameCanvas\" width=\"400\" height=\"400\"></canvas>");
-              client.println("");
-              client.println("<script>");
-              client.println("let currentScore = document.getElementById(\"currentScore\");");
-              client.println("let highscore = document.getElementById(\"highScore\");");
-              client.println("let snakeParts = [];");
-              client.println("let tailLength = 0; // Startlänge der Schlange");
-              client.println("const canvas = document.getElementById(\"gameCanvas\");");
-              client.println("const ctx = canvas.getContext(\"2d\");");
-              client.println("");
-              client.println("let speed = 7;");
-              client.println("let tileCount = 20;");
-              client.println("let tileSize = canvas.width / tileCount - 2;");
-              client.println("let headX = 4;");
-              client.println("let headY = 10;");
-              client.println("let appleX = 10;");
-              client.println("let appleY = 10;");
-              client.println("let xVelocity = 1;");
-              client.println("let yVelocity = 0;");
-              client.println("");
-              client.println("function drawGame() {");
-              client.println("currentScore.innerHTML = \"Score: \" + tailLength;");
-              client.println("if (localStorage.getItem(\"Score\") != 0) {");
-              client.println("highscore.innerHTML = \"Highscore: \" + localStorage.getItem(\"Score\");");
-              client.println("} else {");
-              client.println("highscore.innerHTML = \"Highscore: Noch nicht aufgestellt!\";");
-              client.println("}");
-              client.println("changeSnakePosition();");
-              client.println("let result = isGameOver();");
-              client.println("if (result) {");
-              client.println("return;");
-              client.println("}");
-              client.println("");
-              client.println("clearScreen();");
-              client.println("checkAppleCollision();");
-              client.println("drawApple();");
-              client.println("drawSnake();");
-              client.println("setTimeout(drawGame, 1000 / speed);");
-              client.println("}");
-              client.println("");
-              client.println("function isGameOver() {");
-              client.println("// Spiellogik für Game Over");
-              client.println("if (");
-              client.println("headX < 0 ||");
-              client.println("headX === tileCount ||");
-              client.println("headY < 0 ||");
-              client.println("headY === tileCount");
-              client.println(") {");
-              client.println("restartGame();");
-              client.println("return true;");
-              client.println("}");
-              client.println("for (let part of snakeParts) {");
-              client.println("if (part.x === headX && part.y === headY) {");
-              client.println("restartGame();");
-              client.println("return true;");
-              client.println("}");
-              client.println("}");
-              client.println("return false;");
-              client.println("}");
-              client.println("");
-              client.println("function clearScreen() {");
-              client.println("ctx.fillStyle = \"white\";");
-              client.println("ctx.fillRect(0, 0, canvas.width, canvas.height);");
-              client.println("}");
-              client.println("");
-              client.println("function drawSnake() {");
-              client.println("ctx.fillStyle = \"green\";");
-              client.println("for (let i = 0; i < snakeParts.length; i++) {");
-              client.println("let part = snakeParts[i];");
-              client.println("ctx.fillRect(");
-              client.println("part.x * tileCount,");
-              client.println("part.y * tileCount,");
-              client.println("tileSize,");
-              client.println("tileSize");
-              client.println(");");
-              client.println("}");
-              client.println("");
-              client.println("snakeParts.push({ x: headX, y: headY });");
-              client.println("while (snakeParts.length > tailLength) {");
-              client.println("snakeParts.shift();");
-              client.println("}");
-              client.println("");
-              client.println("// Zeichne den Kopf der Schlange");
-              client.println("ctx.fillStyle = \"green\";");
-              client.println("ctx.fillRect(headX * tileCount, headY * tileCount, tileSize, tileSize);");
-              client.println("}");
-              client.println("");
-              client.println("function changeSnakePosition() {");
-              client.println("headX += xVelocity;");
-              client.println("headY += yVelocity;");
-              client.println("}");
-              client.println("");
-              client.println("function drawApple() {");
-              client.println("ctx.fillStyle = \"red\";");
-              client.println("ctx.fillRect(appleX * tileCount, appleY * tileCount, tileSize, tileSize);");
-              client.println("}");
-              client.println("");
-              client.println("function checkAppleCollision() {");
-              client.println("if (appleX === headX && appleY === headY) {");
-              client.println("appleX = Math.floor(Math.random() * tileCount);");
-              client.println("appleY = Math.floor(Math.random() * tileCount);");
-              client.println("tailLength++;");
-              client.println("}");
-              client.println("}");
-              client.println("");
-              client.println("document.body.addEventListener(\"keydown\", keyDown);");
-              client.println("");
-              client.println("function keyDown(event) {");
-              client.println("if (event.keyCode == 38 && yVelocity != 1) {");
-              client.println("yVelocity = -1;");
-              client.println("xVelocity = 0;");
-              client.println("}");
-              client.println("");
-              client.println("if (event.keyCode == 40 && yVelocity != -1) {");
-              client.println("yVelocity = 1;");
-              client.println("xVelocity = 0;");
-              client.println("}");
-              client.println("");
-              client.println("if (event.keyCode == 37 && xVelocity != 1) {");
-              client.println("xVelocity = -1;");
-              client.println("yVelocity = 0;");
-              client.println("}");
-              client.println("");
-              client.println("if (event.keyCode == 39 && xVelocity != -1) {");
-              client.println("xVelocity = 1;");
-              client.println("yVelocity = 0;");
-              client.println("}");
-              client.println("}");
-              client.println("");
-              client.println("function restartGame() {");
-              client.println("if (parseInt(localStorage.getItem(\"Score\")) <= tailLength) {");
-              client.println("localStorage.setItem(\"Score\", tailLength);");
-              client.println("}");
-              client.println("");
-              client.println("snakeParts = [];");
-              client.println("tailLength = 0;");
-              client.println("speed = 7;");
-              client.println("tileCount = 20;");
-              client.println("tileSize = canvas.width / tileCount - 2;");
-              client.println("headX = 4;");
-              client.println("headY = 10;");
-              client.println("appleX = 10;");
-              client.println("appleY = 10;");
-              client.println("xVelocity = 1;");
-              client.println("yVelocity = 0;");
-              client.println("");
-              client.println("drawGame(); // Spiel neu starten");
-              client.println("}");
-              client.println("");
-              client.println("drawGame();");
-              client.println("</script>");
-              client.println("</body>");
-
-              // END
-            }
-            else
-            {
-
-              // Display the HTML web page
-              client.println("<!DOCTYPE html><html>");
-              client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-              client.println("<meta charset=\"UTF-8\">");
-              // CSS to style the on/off buttons
-              // Feel free to change the background-color and font-size attributes to fit your preferences
-
-              // Web Page Heading
-              client.println("<style>");
-              client.println("body {");
-              client.println("width: 100vw;");
-              client.println("height: 100vh;");
-              client.println("overflow: hidden;");
-              client.println("display: flex;");
-              client.println("justify-content: center;");
-              client.println("align-items: center;");
-              client.println("flex-direction: column;");
-              client.println("}");
-              client.println("</style>");
-              client.println("");
-              client.println("<body>");
-              client.println("<h1>ESP32 - Sensor Projekt</h1>");
-              client.println("<h2>Tag der Offenen Tür 2023</h2>");
-              client.println("");
-              client.println("<div class=\"buttonContainer\">");
-              client.println("<a href=\"/snakeGame\"><button>Snake Spiel</button></a>");
-              client.println("<a href=\"/rawData\"><button>Rohdaten</button></a>");
-              client.println("<a href=\"/formatedData\"><button>Formatierten Daten</button></a>");
-              client.println("</div>");
-              client.println("</body>");
-            }
-
-            // The HTTP response ends with another blank line
-            client.println();
-            // Break out of the while loop
-            break;
-          }
-          else
-          { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        }
-        else if (c != '\r')
-        {                   // if you got anything else but a carriage return character,
-          currentLine += c; // add it to the end of the currentLine
-        }
+    else
+    {
+      digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));
+      delay(400);
+      Serial.print(F("."));
+#if 1
+      if (wifiConnectCounter++ > 30)
+      {
+        // giving up
+        ESP.restart();
       }
+#endif
     }
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
+
+    break;
+
+  case StateSetupWebServer:
+
+    Serial.println(F("Starting Webserver ... "));
+    ArduinoOTA.handle();
+
+#if 1
+    // Route for root / web page
+    webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+                 { request->send(LittleFS, "/index.html"); });
+    webServer.on("/snakeGame", HTTP_GET, [](AsyncWebServerRequest *request)
+                 { request->send(LittleFS, "/snakeGame.html"); });
+    webServer.on("/rawData", HTTP_GET, [](AsyncWebServerRequest *request)
+                 { request->send(LittleFS, "/rawData.html"); });
+    webServer.on("/formattedData", HTTP_GET, [](AsyncWebServerRequest *request)
+                 { request->send(LittleFS, "/rawData.html"); });
+#if 0
+    webServer.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
+                 { request->send(200, "application/x-www-form-urlencoded", "{\"test\":\"success\"}"); });
+
+#endif
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    // Start server
+    webServer.begin();
+#endif
+    webSocketService.begin();
+    delay(200);
+
+    ControlState = StateConnected;
+    break;
+
+  case StateConnected:
+    Serial.println(F("StateConnected:"));
+
+    ControlState = StateOperating;
+    break;
+
+  case StateOperating:
+    // Serial.println("StateOperating:");
+
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      ControlState = StateWifiSetup;
+      break; // exit (hopefully switch statement)
+    }
+
+    ArduinoOTA.handle();
+
+    webSocketService.loop();
+
+    break;
+
+  case StateIdle:
+
+    delay(10);
+    break;
+
+  default:
+    Serial.println(F("Error: invalid ControlState"));
+    ArduinoOTA.handle();
+    delay(1);
   }
+}
+
+void readData(StaticJsonDocument<200> *doc)
+{
+  *doc = Serial2.readStringUntil('\n');
 }
