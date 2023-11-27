@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rohdaten</title>
+  </head>
+  <body>
+    <div class="data">
+      <table class="table">
+        <thead class="tableHead">
+          <th>Sensor:</th>
+          <th>Daten:</th>
+        </thead>
+        <tbody id="tablebody" class="tableBody"></tbody>
+      </table>
+      /1024
+    </div>
+
+    <script>
+      function fillPlaceholders(htmlString, jsonData) {
+        return htmlString.replace(
+          /\{json\.([a-zA-Z0-9_.]+)\}/g,
+          function (match, path) {
+            var keys = path.split(".");
+            var value = jsonData;
+            for (var i = 0; i < keys.length; i++) {
+              if (value[keys[i]] === undefined) {
+                return match; // Return the original match if the path is not found
+              }
+              value = value[keys[i]];
+            }
+            return value;
+          }
+        );
+      }
+
+      let body = document.getElementById("tablebody");
+
+      function initWebsocket() {
+        const socket = new WebSocket("ws://10.102.101.142F:81");
+
+        socket.onopen = function (event) {
+          console.log("Verbindung hergestellt", event);
+        };
+
+        socket.onmessage = function (event) {
+          if (event.data != null && event.data[5] != null) {
+            let data = event.data;
+            data = data.slice(0, -1);
+            console.log(data);
+            let json = JSON.parse(data);
+
+            let string = ```
+      <tr>
+        <td>Potentiometer</td>
+        <td>{json.poti.percent}% oder {json.poti.value}/~1024</td>
+      </tr>
+      <tr>
+        <td>Joystick</td>
+        <td>x: {json.joystick.x} und y: {json.joystick.y}</td>
+      </tr>
+      <tr>
+        <td>Luftfeuchtigkeit:</td>
+        <td>{json.DHT.humidity}%</td>
+      </tr>
+      <tr>
+        <td>Temperatur:</td>
+        <td>{json.DHT.temperature}°C</td>
+      </tr>
+      <tr>
+        <td>Abstandssensor:</td>
+        <td>~{json.Distance.Distance}cm</td>
+      </tr>
+      <tr>
+        <td>Lichtindex:</td>
+        <td>{1024 - json.ldr.value} /1024</td>
+      </tr>
+      <tr>
+        <td>Bewegungssensor:</td>
+        <td>{json.motion.active}</td>
+      </tr>
+      ```;
+
+            body.innerHTML = fillPlaceholders(string, json);
+            console.log(fillPlaceholders(string, json));
+          }
+        };
+
+        socket.onerror = function (event) {
+          console.error("Fehler erkannt:", event);
+        };
+
+        socket.onclose = function (event) {
+          console.log("Verbindung geschlossen", event);
+        };
+      }
+      initWebsocket();
+    </script>
+  </body>
+</html>

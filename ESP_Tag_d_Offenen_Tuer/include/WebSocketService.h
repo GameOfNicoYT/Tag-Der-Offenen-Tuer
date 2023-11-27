@@ -30,6 +30,7 @@ public:
 
   void begin(void);
   void loop(void);
+  void sendData(String data);
 };
 
 #endif // _WEBSOCKETSERVICE_H_

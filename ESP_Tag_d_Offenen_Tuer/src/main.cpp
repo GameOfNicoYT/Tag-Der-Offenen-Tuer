@@ -48,11 +48,52 @@
 #include "esp_wpa2.h"
 #include "credentials.h"
 
+String incomingMessage;
+bool messageComplete;
+
+WebSocketService webSocketService;
+HardwareSerial transfare(1);
+
+void sendStatus(String status)
+{
+
+  if (status == "s")
+  {
+    transfare.println("snake");
+  }
+  else
+  {
+    transfare.println("normal");
+  }
+}
+
+void readData()
+{
+
+  incomingMessage = ""; // Nachricht zurücksetzen
+  while (transfare.available() && !messageComplete)
+  {
+    char inChar = (char)transfare.read();
+    incomingMessage += inChar;
+
+    if (inChar == ';')
+    {
+      messageComplete = true;
+    }
+  }
+
+  if (messageComplete)
+  {
+    messageComplete = false;
+  }
+
+  webSocketService.sendData(incomingMessage);
+}
+
 #define LED_STATUS 4
 #define OTA_NAME "webserver" // defined in platformio.ini
 
 AsyncWebServer webServer(80);
-WebSocketService webSocketService;
 
 uint8_t wifiConnectCounter = 0;
 
@@ -213,7 +254,7 @@ void setup()
   // pinMode(LED_STATUS, OUTPUT);
 
   Serial.begin(9600);
-  Serial2.begin(115200);
+  transfare.begin(115200, SERIAL_8N1, 16, 17);
 
   Serial.println("\nStarting WebServer - (" OTA_NAME ")");
   setupFilesystem();
@@ -235,9 +276,6 @@ ControlStateType ControlState = StateInit;
 
 void loop()
 {
-  // Read the String until the JSON is fully sent;
-  StaticJsonDocument<200> doc;
-  readData(&doc);
 
   switch (ControlState)
   {
@@ -313,13 +351,13 @@ void loop()
 #if 1
     // Route for root / web page
     webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/index.html"); });
+                 { request->send(LittleFS, "/index.html"); sendStatus("n"); });
     webServer.on("/snakeGame", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/snakeGame.html"); });
+                 { request->send(LittleFS, "/snakeGame.html"); sendStatus("s"); });
     webServer.on("/rawData", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/rawData.html"); });
+                 { request->send(LittleFS, "/rawData.html"); sendStatus("n"); });
     webServer.on("/formattedData", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/rawData.html"); });
+                 { request->send(LittleFS, "/rawData.html"); sendStatus("n"); });
 #if 0
     webServer.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
                  { request->send(200, "application/x-www-form-urlencoded", "{\"test\":\"success\"}"); });
@@ -346,7 +384,7 @@ void loop()
 
   case StateOperating:
     // Serial.println("StateOperating:");
-
+    readData();
     if (WiFi.status() != WL_CONNECTED)
     {
       ControlState = StateWifiSetup;
@@ -369,9 +407,4 @@ void loop()
     ArduinoOTA.handle();
     delay(1);
   }
-}
-
-void readData(StaticJsonDocument<200> *doc)
-{
-  *doc = Serial2.readStringUntil('\n');
 }

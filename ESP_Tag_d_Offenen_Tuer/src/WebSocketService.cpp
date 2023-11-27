@@ -42,17 +42,6 @@ void WebSocketService::webSocketEvent(uint8_t num, WStype_t type, uint8_t *paylo
     // -----------------------------------------------------------
     //                      SEND DATA
 
-    // send message to client
-    String recieveData;
-    String sendData;
-
-    StaticJsonDocument<200> doc;
-
-    doc = Serial1.readStringUntil('\n');
-    deserializeJson(doc, recieveData);
-    serializeJson(doc, sendData);
-    webSocket.sendTXT(num, sendData);
-
     break;
   }
 
@@ -79,37 +68,9 @@ void WebSocketService::webSocketEvent(uint8_t num, WStype_t type, uint8_t *paylo
   }
 }
 
-#if 0
-void WebSocketService::broadcastStatus()
+void WebSocketService::sendData(String data)
 {
-  char buf[JSON_DATA_MAX];
-  DynamicJsonDocument jsonDoc(JSON_DATA_MAX);
-  jsonDoc[F("type")] = F("status");
-  jsonDoc[F("value")] = (uint8_t)lastStatus;
-  serializeJson(jsonDoc, Serial);
-  serializeJson(jsonDoc, buf);
-  webSocket.broadcastTXT(buf);
+  webSocket.broadcastTXT(data);
+  Serial.println("SENT DATA TO CLIENTS");
+  delay(5);
 }
-
-void WebSocketService::broadcastStatus(StatusCode status)
-{
-  if (lastStatus == status) return;
-
-  lastStatus = status;
-  broadcastStatus();
-}
-
-void WebSocketService::sendVersion(uint8_t num)
-{
-  char buf[JSON_DATA_MAX];
-  char version[30];
-  snprintf(version, sizeof(version), "%s - %c, %d", VERSION, VARIANT, BAUDRATE);
-  DynamicJsonDocument jsonDoc(JSON_DATA_MAX);
-  jsonDoc[F("type")] = F("version");
-  jsonDoc[F("value")] = version;
-  Serial.println();
-  serializeJson(jsonDoc, Serial);
-  serializeJson(jsonDoc, buf);
-  webSocket.sendTXT(num, buf);
-}
-#endif

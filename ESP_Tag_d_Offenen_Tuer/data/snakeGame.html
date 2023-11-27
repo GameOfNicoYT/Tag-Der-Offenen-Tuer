@@ -20,33 +20,48 @@
   <canvas id="gameCanvas" width="400" height="400"></canvas>
 
   <script>
-    let currentScore = document.getElementById("currentScore");
-    let highscore = document.getElementById("highScore");
-    let snakeParts = [];
-    let tailLength = 0; // Startlänge der Schlange
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+    let testData = {
+      poti: { percent: 1, value: 2 },
+      joystick: { x: 504, y: 509 },
+      reset: 0,
+      DHT: { humidity: 47, temperature: 25.4 },
+      Distance: { Distance: "Error" },
+      ldr: { value: 147 },
+      motion: { active: 0 },
+    };
 
-    let speed = 7;
-    let tileCount = 20;
-    let tileSize = canvas.width / tileCount - 2;
-    let headX = 4;
-    let headY = 10;
-    let appleX = 10;
-    let appleY = 10;
-    let xVelocity = 1;
-    let yVelocity = 0;
+    function initWebsocket() {
+      const socket = new WebSocket("ws://10.102.101.142:21");
 
-    function drawGame() {
-      const socket = new WebSocket("ws://10.0.0.21:81");
       socket.onopen = function (event) {
         console.log("Verbindung hergestellt", event);
       };
 
       socket.onmessage = function (event) {
-        console.log("Nachricht empfangen:", event.data);
-        if (event.data != null) {
-          highscore.innerHTML = "HALLO";
+        if (event.data != null && event.data[5] != null) {
+          let data = event.data;
+          data = data.slice(0, -1);
+          console.log(data);
+          let json = JSON.parse(data);
+
+          console.log(json);
+
+          if (json.x > 800 && yVelocity != -1) {
+            xVelocity = 0;
+            yVelocity = 1;
+          }
+          if (json.x < 200 && yVelocity != 1) {
+            xVelocity = 0;
+            yVelocity = -1;
+          }
+          if (json.y > 800 && xVelocity != 1) {
+            yVelocity = 0;
+            xVelocity = -1;
+          }
+          if (json.y < 200 && xVelocity != -1) {
+            yVelocity = 0;
+            xVelocity = 1;
+          }
         }
       };
 
@@ -57,9 +72,61 @@
       socket.onclose = function (event) {
         console.log("Verbindung geschlossen", event);
       };
+    }
 
+    function getCookie(name) {
+      var nameEQ = name + "=";
+      var ca = document.cookie.split(";");
+      for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == " ") c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+      }
+      return null;
+    }
+
+    function checkCookieExists(name) {
+      var nameEQ = name + "=";
+      var ca = document.cookie.split(";");
+      for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == " ") c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return true;
+      }
+      return false;
+    }
+
+    function deleteCookie(name) {
+      document.cookie =
+        name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+
+    initWebsocket();
+
+    let currentScore = document.getElementById("currentScore");
+    let highscore = document.getElementById("highScore");
+    let snakeParts = [];
+    let tailLength = 0; // Startlänge der Schlange
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let speed = 5;
+    let tileCount = 20;
+    let tileSize = canvas.width / tileCount - 2;
+    let headX = 4;
+    let headY = 10;
+    let appleX = 10;
+    let appleY = 10;
+    let xVelocity = 1;
+    let yVelocity = 0;
+
+    function drawGame() {
       currentScore.innerHTML = "Score: " + tailLength;
-
+      highscore.innerHTML =
+        "Highscore: " +
+        getCookie("highscore") +
+        " aufgestellt von: " +
+        getCookie("name");
       changeSnakePosition();
       let result = isGameOver();
       if (result) {
@@ -163,8 +230,22 @@
     }
 
     function restartGame() {
-      if (parseInt(localStorage.getItem("Score")) <= tailLength) {
-        localStorage.setItem("Score", tailLength);
+      var date = new Date();
+
+      date.setTime(date.getTime() + 7 * 24 * 60 * 60 * 1000);
+      if (checkCookieExists("highscore")) {
+        if (parseInt(getCookie("highscore")) < tailLength) {
+          document.cookie =
+            "highscore=" + tailLength + "; expires=" + date + "; path=/";
+          let name = window.prompt("Gib deinen Namen an: ");
+          if (name != null) {
+            document.cookie = "name=" + name + "; expires=" + date + "; path=/";
+          } else {
+            deleteCookie("name");
+          }
+        }
+      } else {
+        document.cookie = "highscore=0; expires=" + date + "; path=/";
       }
 
       snakeParts = [];
