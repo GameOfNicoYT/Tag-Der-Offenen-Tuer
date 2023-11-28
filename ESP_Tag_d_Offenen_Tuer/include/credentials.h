@@ -14,7 +14,7 @@ CREDENTIAL currentWifi; // global to store found wifi
 // * = Passwort
 
 std::vector<CREDENTIAL> const credentials = {
-    {"Proyer", "", "Unterrohr264", "10.0.0.21"},
+    {"Proyer", "", "Unterrohr264", ""},
     {"IPHONE", "", "Proyer08", ""},
     {"htlpinkafeld", "nico.proyer", "Unterrohr!264_2023", ""}};
 #endif

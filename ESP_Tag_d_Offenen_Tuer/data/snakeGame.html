@@ -31,7 +31,7 @@
     };
 
     function initWebsocket() {
-      const socket = new WebSocket("ws://10.102.101.142:21");
+      const socket = new WebSocket("ws://10.102.101.142:81");
 
       socket.onopen = function (event) {
         console.log("Verbindung hergestellt", event);
@@ -46,19 +46,19 @@
 
           console.log(json);
 
-          if (json.x > 800 && yVelocity != -1) {
+          if (json.x > 700 && yVelocity != -1) {
             xVelocity = 0;
             yVelocity = 1;
           }
-          if (json.x < 200 && yVelocity != 1) {
+          if (json.x < 300 && yVelocity != 1) {
             xVelocity = 0;
             yVelocity = -1;
           }
-          if (json.y > 800 && xVelocity != 1) {
+          if (json.y > 700 && xVelocity != 1) {
             yVelocity = 0;
             xVelocity = -1;
           }
-          if (json.y < 200 && xVelocity != -1) {
+          if (json.y < 300 && xVelocity != -1) {
             yVelocity = 0;
             xVelocity = 1;
           }
@@ -110,7 +110,7 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
-    let speed = 5;
+    let speed = 3;
     let tileCount = 20;
     let tileSize = canvas.width / tileCount - 2;
     let headX = 4;
@@ -250,7 +250,7 @@
 
       snakeParts = [];
       tailLength = 0;
-      speed = 7;
+      speed = 3;
       tileCount = 20;
       tileSize = canvas.width / tileCount - 2;
       headX = 4;

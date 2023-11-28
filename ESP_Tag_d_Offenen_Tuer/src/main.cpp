@@ -87,6 +87,7 @@ void readData()
     messageComplete = false;
   }
 
+  Serial.println(incomingMessage);
   webSocketService.sendData(incomingMessage);
 }
 
@@ -358,6 +359,8 @@ void loop()
                  { request->send(LittleFS, "/rawData.html"); sendStatus("n"); });
     webServer.on("/formattedData", HTTP_GET, [](AsyncWebServerRequest *request)
                  { request->send(LittleFS, "/rawData.html"); sendStatus("n"); });
+    webServer.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
+                 { request->send(LittleFS, "/img/favicon.ico"); sendStatus("n"); });
 #if 0
     webServer.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
                  { request->send(200, "application/x-www-form-urlencoded", "{\"test\":\"success\"}"); });
