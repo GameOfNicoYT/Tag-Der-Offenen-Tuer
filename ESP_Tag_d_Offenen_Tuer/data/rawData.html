@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rohdaten</title>
+    <title>Sensor Board | Rohdaten</title>
   </head>
   <body>
     <div class="data">
@@ -14,85 +14,69 @@
         </thead>
         <tbody id="tablebody" class="tableBody"></tbody>
       </table>
-      /1024
     </div>
 
     <script>
-      function fillPlaceholders(htmlString, jsonData) {
-        return htmlString.replace(
-          /\{json\.([a-zA-Z0-9_.]+)\}/g,
-          function (match, path) {
-            var keys = path.split(".");
-            var value = jsonData;
-            for (var i = 0; i < keys.length; i++) {
-              if (value[keys[i]] === undefined) {
-                return match; // Return the original match if the path is not found
-              }
-              value = value[keys[i]];
-            }
-            return value;
-          }
-        );
-      }
-
       let body = document.getElementById("tablebody");
 
       function initWebsocket() {
-        const socket = new WebSocket("ws://10.102.101.142F:81");
+        const socket = new WebSocket("ws://10.0.0.21:81");
 
         socket.onopen = function (event) {
           console.log("Verbindung hergestellt", event);
         };
 
         socket.onmessage = function (event) {
-          if (event.data != null && event.data[5] != null) {
+          if (
+            event.data != null &&
+            event.data[5] != null &&
+            event.data != '{"status":"conncected"}'
+          ) {
             let data = event.data;
             data = data.slice(0, -1);
             console.log(data);
             let json = JSON.parse(data);
 
-            let string = ```
-      <tr>
-        <td>Potentiometer</td>
-        <td>{json.poti.percent}% oder {json.poti.value}/~1024</td>
-      </tr>
-      <tr>
-        <td>Joystick</td>
-        <td>x: {json.joystick.x} und y: {json.joystick.y}</td>
-      </tr>
-      <tr>
-        <td>Luftfeuchtigkeit:</td>
-        <td>{json.DHT.humidity}%</td>
-      </tr>
-      <tr>
-        <td>Temperatur:</td>
-        <td>{json.DHT.temperature}°C</td>
-      </tr>
-      <tr>
-        <td>Abstandssensor:</td>
-        <td>~{json.Distance.Distance}cm</td>
-      </tr>
-      <tr>
-        <td>Lichtindex:</td>
-        <td>{1024 - json.ldr.value} /1024</td>
-      </tr>
-      <tr>
-        <td>Bewegungssensor:</td>
-        <td>{json.motion.active}</td>
-      </tr>
-      ```;
-
-            body.innerHTML = fillPlaceholders(string, json);
-            console.log(fillPlaceholders(string, json));
+            body.innerHTML = `
+                  <tr>
+                    <td>Potentiometer</td>
+                    <td>${json.poti.percent}% oder ${json.poti.value}/~1024</td>
+                  </tr>
+                  <tr>
+                    <td>Joystick</td>
+                    <td>x: ${json.joystick.x} und y: ${json.joystick.y}</td>
+                  </tr>
+                  <tr>
+                    <td>Luftfeuchtigkeit:</td>
+                    <td>${json.DHT.humidity}%</td>
+                  </tr>
+                  <tr>
+                    <td>Temperatur:</td>
+                    <td>${json.DHT.temperature}°C</td>
+                  </tr>
+                  <tr>
+                    <td>Abstandssensor:</td>
+                    <td>~${json.Distance.Distance}cm</td>
+                  </tr>
+                  <tr>
+                    <td>Lichtindex:</td>
+                    <td>${1024 - json.ldr.value} /1024</td>
+                  </tr>
+                  <tr>
+                    <td>Bewegungssensor:</td>
+                    <td>${json.motion.active}</td>
+                  </tr>
+                  `;
           }
         };
 
         socket.onerror = function (event) {
-          console.error("Fehler erkannt:", event);
-        };
+          if (event.data != null && event.data[5] != null) {
+          }
 
-        socket.onclose = function (event) {
-          console.log("Verbindung geschlossen", event);
+          socket.onclose = function (event) {
+            console.log("Verbindung geschlossen", event);
+          };
         };
       }
       initWebsocket();
