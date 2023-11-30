@@ -266,7 +266,8 @@ void loop()
       Serial.println(error.f_str());
       return;
     }
-    else{
+    else
+    {
       ip = doc.ip;
       networkName = doc.networkName
     }
