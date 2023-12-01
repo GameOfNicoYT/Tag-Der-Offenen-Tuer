@@ -72,5 +72,4 @@ void WebSocketService::sendData(String data)
 {
   webSocket.broadcastTXT(data);
   Serial.println("SENT DATA TO CLIENTS");
-  delay(5);
 }

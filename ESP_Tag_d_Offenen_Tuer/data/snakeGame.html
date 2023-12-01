@@ -34,14 +34,14 @@
     };
 
     function initWebsocket() {
-      const socket = new WebSocket("ws://10.0.0.21:81");
+      const socket = new WebSocket("ws://10.102.101.142:81");
 
       socket.onopen = function (event) {
         console.log("Verbindung hergestellt", event);
       };
 
       socket.onmessage = function (event) {
-        if (event.data != null && event.data[5] != null) {
+        if (event.data != null && event.data != '{"status":"conncected"}') {
           let data = event.data;
           data = data.slice(0, -1);
           console.log(data);
@@ -49,19 +49,19 @@
 
           console.log(json);
 
-          if (json.x > 700 && yVelocity != -1) {
+          if (json.joystick.x > 700 && yVelocity != -1) {
             xVelocity = 0;
             yVelocity = 1;
           }
-          if (json.x < 300 && yVelocity != 1) {
+          if (json.joystick.x < 300 && yVelocity != 1) {
             xVelocity = 0;
             yVelocity = -1;
           }
-          if (json.y > 700 && xVelocity != 1) {
+          if (json.joystick.y > 700 && xVelocity != 1) {
             yVelocity = 0;
             xVelocity = -1;
           }
-          if (json.y < 300 && xVelocity != -1) {
+          if (json.joystick.y < 300 && xVelocity != -1) {
             yVelocity = 0;
             xVelocity = 1;
           }

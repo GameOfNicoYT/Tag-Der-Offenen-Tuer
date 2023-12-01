@@ -48,8 +48,8 @@
 #include "esp_wpa2.h"
 #include "credentials.h"
 
-String incomingMessage;
 bool messageComplete;
+String incomingMessage;
 
 WebSocketService webSocketService;
 HardwareSerial transfare(1);
@@ -69,8 +69,6 @@ void sendStatus(String status)
 
 void readData()
 {
-
-  incomingMessage = ""; // Nachricht zurücksetzen
   while (transfare.available() && !messageComplete)
   {
     char inChar = (char)transfare.read();
@@ -84,15 +82,13 @@ void readData()
 
   if (messageComplete)
   {
+    Serial.println(incomingMessage);
+    webSocketService.sendData(incomingMessage);
     messageComplete = false;
+    incomingMessage = "";
   }
-
-  Serial.println(incomingMessage);
-  webSocketService.sendData(incomingMessage);
 }
 
-#define LED_STATUS 4
-#define OTA_NAME "webserver" // defined in platformio.ini
 
 AsyncWebServer webServer(80);
 
@@ -318,7 +314,7 @@ void loop()
       // WiFi.softAPdisconnect (true);
       Serial.println(WiFi.SSID());
       Serial.println(WiFi.localIP());
-      String ip = '{"IP": "' + (String)WiFi.localIP() + '", "networkName": "' + (String)WiFi.SSID() + '"}';
+      String ip = "{\"IP\": \"" + (String)WiFi.localIP() + "\", \"networkName\": \"" + (String)WiFi.SSID() + "\"}";
       /*
               if (!MDNS.begin(OTA_NAME))
               {
@@ -354,18 +350,15 @@ void loop()
 #if 1
     // Route for root / web page
     webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/index.html"); sendStatus("n"); });
+                 { request->send(LittleFS, "/index.html"); });
     webServer.on("/snakeGame", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/snakeGame.html"); sendStatus("s"); });
+                 { request->send(LittleFS, "/snakeGame.html"); });
     webServer.on("/rawData", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(LittleFS, "/rawData.html"); sendStatus("n"); });
+                 { request->send(LittleFS, "/rawData.html"); });
     webServer.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request)
                  { request->send(LittleFS, "/img/favicon.ico"); });
     webServer.on("/img/htl.png", HTTP_GET, [](AsyncWebServerRequest *request)
                  { request->send(LittleFS, "/img/htl.png"); });
-#if 0
-    webServer.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
-                 { request->send(200, "application/x-www-form-urlencoded", "{\"test\":\"success\"}"); });
 
 #endif
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -374,7 +367,6 @@ void loop()
 
     // Start server
     webServer.begin();
-#endif
     webSocketService.begin();
     delay(100);
 

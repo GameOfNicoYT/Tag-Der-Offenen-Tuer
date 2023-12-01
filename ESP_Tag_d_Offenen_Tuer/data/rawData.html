@@ -4,15 +4,84 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sensor Board | Rohdaten</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        transition: all 0.5s ease;
+      }
+
+      th {
+        background: silver;
+      }
+
+      td,
+      th {
+        z-index: 2;
+        font-size: 1.5rem;
+        border: 2px solid black;
+        margin: 0;
+        padding: 2px;
+        text-align: center;
+      }
+
+      td:hover {
+        cursor: pointer;
+        background: rgb(143, 143, 143);
+        transform: translate(-10px, -10px);
+        box-shadow: 3.3px 3.3px #707070, 6.6px 6.6px #024a92, 10px 10px #707070;
+      }
+
+      .data {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        
+      }
+
+      .data table {
+        width: 50%;
+        height: 50%;
+      }
+    </style>
   </head>
   <body>
+    <a class="" href="./"><button>< Zurück</button></a>
     <div class="data">
+      <h1>Rohdaten</h1>
       <table class="table">
         <thead class="tableHead">
           <th>Sensor:</th>
           <th>Daten:</th>
         </thead>
-        <tbody id="tablebody" class="tableBody"></tbody>
+        <tbody id="tablebody" class="tableBody">
+          <tr>
+            <td>Potentiometer</td>
+            <td>${json.poti.percent}% oder ${json.poti.value}/~1024</td>
+          </tr>
+          <tr>
+            <td>Joystick</td>
+            <td>x: ${json.joystick.x} und y: ${json.joystick.y}</td>
+          </tr>
+          <tr>
+            <td>Luftfeuchtigkeit:</td>
+            <td>${json.DHT.humidity}%</td>
+          </tr>
+          <tr>
+            <td>Temperatur:</td>
+            <td>${json.DHT.temperature}°C</td>
+          </tr>
+          <tr>
+            <td>Abstandssensor:</td>
+            <td>~${json.Distance.Distance}cm</td>
+          </tr>
+          <tr>
+            <td>Lichtindex:</td>
+            <td>${1024 - json.ldr.value} /1024</td>
+          </tr>
+        </tbody>
       </table>
     </div>
 
@@ -20,7 +89,7 @@
       let body = document.getElementById("tablebody");
 
       function initWebsocket() {
-        const socket = new WebSocket("ws://10.0.0.21:81");
+        const socket = new WebSocket("ws://10.102.101.142:81");
 
         socket.onopen = function (event) {
           console.log("Verbindung hergestellt", event);
@@ -61,10 +130,6 @@
                   <tr>
                     <td>Lichtindex:</td>
                     <td>${1024 - json.ldr.value} /1024</td>
-                  </tr>
-                  <tr>
-                    <td>Bewegungssensor:</td>
-                    <td>${json.motion.active}</td>
                   </tr>
                   `;
           }

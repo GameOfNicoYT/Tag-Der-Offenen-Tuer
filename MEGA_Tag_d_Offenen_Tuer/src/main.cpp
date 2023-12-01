@@ -268,8 +268,8 @@ void loop()
     }
     else
     {
-      ip = doc.ip;
-      networkName = doc.networkName
+      // ip = doc["ip"];
+      // networkName = doc["networkName"];
     }
     messageComplete = false;
   }
@@ -339,7 +339,6 @@ void loop()
   }
 
   writeData();
-  getStatus();
 }
 
 void getStatus()
@@ -377,56 +376,48 @@ void getStatus()
 void writeData()
 {
 
-  StaticJsonDocument<200>
+  StaticJsonDocument<1000>
       doc;
 
   bool distanceError;
 
-  if (snakeActive)
+  digitalWrite(DistanceTRIG, LOW);
+  delay(5);
+  digitalWrite(DistanceTRIG, HIGH);
+  delay(10);
+  digitalWrite(DistanceTRIG, LOW);
+  dauer = pulseIn(DistanceECHO, HIGH);
+  entfernung = (dauer / 2) * 0.03432;
+  if (entfernung >= 500 || entfernung <= 0)
   {
-    delay(5);
-    doc["x"] = analogRead(JoyStickX); // TRIGGER: 500
-    doc["y"] = analogRead(JoyStickY); // TRIGGER: 500
-    delay(5);
+    distanceError = true;
   }
   else
   {
-    digitalWrite(DistanceTRIG, LOW);
-    delay(5);
-    digitalWrite(DistanceTRIG, HIGH);
-    delay(10);
-    digitalWrite(DistanceTRIG, LOW);
-    dauer = pulseIn(DistanceECHO, HIGH);
-    entfernung = (dauer / 2) * 0.03432;
-    if (entfernung >= 500 || entfernung <= 0)
-    {
-      distanceError = true;
-    }
-    else
-    {
-      distanceError = false;
-    }
-
-    doc["poti"]["percent"] = round((float)analogRead(poti) / 10.2);
-    doc["poti"]["value"] = analogRead(poti) - 4;
-    doc["joystick"]["x"] = analogRead(JoyStickX); // TRIGGER: 500
-    doc["joystick"]["y"] = analogRead(JoyStickY); // TRIGGER: 500
-    doc["reset"] = digitalRead(resetButton);
-    doc["DHT"]["humidity"] = dht.readHumidity();
-    doc["DHT"]["temperature"] = dht.readTemperature();
-    if (distanceError)
-    {
-      doc["Distance"]["Distance"] = distanceError;
-    }
-    else
-    {
-      doc["Distance"]["Distance"] = entfernung;
-    }
-    doc["ldr"]["value"] = analogRead(LDR_DATA);
+    distanceError = false;
   }
+
+  doc["poti"]["percent"] = round((float)analogRead(poti) / 10.2);
+  doc["poti"]["value"] = analogRead(poti) - 4;
+  doc["joystick"]["x"] = analogRead(JoyStickX); // TRIGGER: 500
+  doc["joystick"]["y"] = analogRead(JoyStickY); // TRIGGER: 500
+  doc["reset"] = digitalRead(resetButton);
+  doc["DHT"]["humidity"] = dht.readHumidity();
+  doc["DHT"]["temperature"] = dht.readTemperature();
+  if (distanceError)
+  {
+    doc["Distance"]["Distance"] = distanceError;
+  }
+  else
+  {
+    doc["Distance"]["Distance"] = entfernung;
+  }
+  doc["ldr"]["value"] = analogRead(LDR_DATA);
+
   String output = "";
   serializeJson(doc, output);
   output += ';';
   Serial.println(output);
   Serial2.println(output);
+  delay(75);
 }
