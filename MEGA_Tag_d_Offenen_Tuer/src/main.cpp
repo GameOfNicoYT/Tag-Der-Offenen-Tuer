@@ -33,6 +33,11 @@ License type: MIT
 #include <Adafruit_SH1106.h>
 
 #define OLED_RESET 13
+/*
+Here you can define your Build mode:
+true = DEV           false = release
+*/
+#define dev true
 
 Adafruit_SH1106 display(OLED_RESET);
 
@@ -254,16 +259,19 @@ void loop()
   }
   if (messageComplete)
   {
+#if dev
     Serial.println(incomingMessage);
-
+#endif
     // Deserialisiere den JSON-String
     DeserializationError error = deserializeJson(doc, networkData);
 
     // Prüfe auf Fehler
     if (error)
     {
+#if dev
       Serial.print("deserializeJson() failed: ");
       Serial.println(error.f_str());
+#endif
       return;
     }
     else
@@ -356,17 +364,23 @@ void getStatus()
   }
   if (messageComplete)
   {
+#if dev
     Serial.println(incomingMessage);
+#endif
 
     if (incomingMessage[0] == 's')
     {
       snakeActive = true;
+#if dev
       Serial.println("Changed!");
+#endif
     }
     if (incomingMessage[0] == 'n')
     {
       snakeActive = false;
+#if dev
       Serial.println("Changed!");
+#endif
     }
 
     messageComplete = false;
@@ -417,7 +431,9 @@ void writeData()
   String output = "";
   serializeJson(doc, output);
   output += ';';
+#if dev
   Serial.println(output);
+#endif
   Serial2.println(output);
   delay(75);
 }

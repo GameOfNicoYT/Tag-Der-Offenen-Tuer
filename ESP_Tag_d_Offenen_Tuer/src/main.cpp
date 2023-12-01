@@ -48,6 +48,12 @@
 #include "esp_wpa2.h"
 #include "credentials.h"
 
+/*
+Here you can define your Build mode:
+true = DEV           false = release
+*/
+#define dev true
+
 #define OTA_NAME "NULL"
 #define LED_STATUS 0
 bool messageComplete;
@@ -87,7 +93,9 @@ void readData()
 
   if (messageComplete)
   {
+#if dev
     Serial.println(incomingMessage);
+#endif
     webSocketService.sendData(incomingMessage);
 
     messageComplete = false;
@@ -103,28 +111,34 @@ bool ConnectWifi(void)
 {
   int i = 0;
   bool isWifiValid = false;
-
+#if dev
   Serial.println("starting scan");
+#endif
   // scan for nearby networks:
   int numSsid = WiFi.scanNetworks();
-
+#if dev
   Serial.print("scanning WIFI, found ");
   Serial.print(numSsid);
   Serial.println(" available access points:");
+#endif
 
   if (numSsid == -1)
   {
+#if dev
     Serial.println("Couldn't get a wifi connection");
+#endif
     return false;
   }
 
   for (int i = 0; i < numSsid; i++)
   {
+#if dev
     Serial.print(i + 1);
     Serial.print(". ");
     Serial.print(WiFi.SSID(i));
     Serial.print("  ");
     Serial.println(WiFi.RSSI(i));
+#endif
   }
 
   // search for given credentials
@@ -134,8 +148,10 @@ bool ConnectWifi(void)
     {
       if (strcmp(WiFi.SSID(j).c_str(), credential.ssid) == 0)
       {
+#if dev
         Serial.print("credentials found for: ");
         Serial.println(credential.ssid);
+#endif
         currentWifi = credential;
         isWifiValid = true;
       }
@@ -144,13 +160,16 @@ bool ConnectWifi(void)
 
   if (!isWifiValid)
   {
+#if dev
     Serial.println("no matching credentials");
+#endif
     return false;
   }
 
-  // try to connect
+// try to connect
+#if dev
   Serial.println(WiFi.macAddress());
-
+#endif
   if (strlen(currentWifi.username))
   {
     // username not empty -> WPA2  magic starts here
@@ -170,9 +189,11 @@ bool ConnectWifi(void)
     // try to connect WPA
     WiFi.begin(currentWifi.ssid, currentWifi.password);
     WiFi.setHostname(OTA_NAME);
+#if dev
     Serial.println("");
     Serial.print("Connecting to WiFi ");
     Serial.println(currentWifi.ssid);
+#endif
   }
 
   i = 0;
@@ -180,7 +201,9 @@ bool ConnectWifi(void)
   {
     digitalWrite(LED_STATUS, LOW);
     delay(300);
+#if dev
     Serial.print(".");
+#endif
     digitalWrite(LED_STATUS, HIGH);
     delay(300);
     if (i++ > 50)
@@ -206,33 +229,45 @@ void setupOTA()
 
   ArduinoOTA.onStart([]()
                      {
-    
+#if dev
     Serial.print(F("Start updating "));
+#endif
     if (ArduinoOTA.getCommand() == U_FLASH) {
+#if dev
       Serial.println(F("sketch"));
-    } else { // U_FS
+#endif } else { // U_FS
+#if dev
       Serial.println(F("filesystem"));
+#endif
     }
 
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
     LittleFS.end(); });
 
   ArduinoOTA.onEnd([]()
-                   { Serial.println(F("\nEnd")); });
+                   {
+#if dev
+                     Serial.println(F("\nEnd"));
+#endif
+                   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
                         {
+#if dev
     Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+#endif
     digitalWrite(LED_STATUS, !digitalRead(LED_STATUS)); });
 
   ArduinoOTA.onError([](ota_error_t error)
                      {
+#if dev
     Serial.printf("Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) Serial.println(F("Auth Failed"));
     else if (error == OTA_BEGIN_ERROR) Serial.println(F("Begin Failed"));
     else if (error == OTA_CONNECT_ERROR) Serial.println(F("Connect Failed"));
     else if (error == OTA_RECEIVE_ERROR) Serial.println(F("Receive Failed"));
     else if (error == OTA_END_ERROR) Serial.println(F("End Failed")); });
+#endif
 
   ArduinoOTA.begin();
 }
@@ -241,11 +276,15 @@ void setupFilesystem()
 {
   if (LittleFS.begin())
   {
+#if dev
     Serial.println("FileSystem started");
+#endif
   }
   else
   {
+#if dev
     Serial.println("formatting FileSystem ...");
+#endif
     LittleFS.format();
     ESP.restart();
   }
@@ -257,8 +296,9 @@ void setup()
 
   Serial.begin(9600);
   transfare.begin(115200, SERIAL_8N1, 16, 17);
-
+#if dev
   Serial.println("\nStarting WebServer - (" OTA_NAME ")");
+#endif
   setupFilesystem();
 }
 
@@ -283,49 +323,44 @@ void loop()
   {
   case StateInit:
 
-    // Serial.println("StateInit:");
-    //    WiFi.mode(WIFI_STA);
-
     ControlState = StateNotConnected;
     break;
 
   case StateNotConnected:
-    // Serial.println("StateNotConnected:");
 
     wifiConnectCounter = 0;
     ControlState = StateWifiSetup;
     break;
 
   case StateWifiSetup:
+#if dev
     Serial.println(F("StateWifiSetup:"));
+#endif
 
     ControlState = StateWifiConnecting;
     break;
 
   case StateWifiConnecting:
-    // Serial.println(F("StateMqttConnecting:"));
     ConnectWifi();
 
     if (WiFi.status() == WL_CONNECTED)
     {
+#if dev
       Serial.println("");
       Serial.print("Connected to ");
       Serial.println(WiFi.SSID());
       Serial.print("IP address: ");
       Serial.println(WiFi.localIP());
       Serial.println();
+#endif
       delay(1000);
 
-      // WiFi.softAPdisconnect (true);
+// WiFi.softAPdisconnect (true);
+#if dev
       Serial.println(WiFi.SSID());
       Serial.println(WiFi.localIP());
+#endif
       String ip = "{\"IP\": \"" + (String)WiFi.localIP() + "\", \"networkName\": \"" + (String)WiFi.SSID() + "\"}";
-      /*
-              if (!MDNS.begin(OTA_NAME))
-              {
-                Serial.println(F("mDNS init failed"));
-              }
-      */
       setupOTA();
       transfare.println(ip);
 
@@ -335,7 +370,9 @@ void loop()
     {
       digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));
       delay(400);
+#if dev
       Serial.print(F("."));
+#endif
 #if 1
       if (wifiConnectCounter++ > 30)
       {
@@ -348,8 +385,9 @@ void loop()
     break;
 
   case StateSetupWebServer:
-
+#if dev
     Serial.println(F("Starting Webserver ... "));
+#endif
     ArduinoOTA.handle();
 
 #if 1
@@ -379,13 +417,17 @@ void loop()
     break;
 
   case StateConnected:
+#if dev
     Serial.println(F("StateConnected:"));
+#endif
 
     ControlState = StateOperating;
     break;
 
   case StateOperating:
-    // Serial.println("StateOperating:");
+#if dev
+// Serial.println("StateOperating:");
+#endif
     readData();
     if (WiFi.status() != WL_CONNECTED)
     {
@@ -405,7 +447,9 @@ void loop()
     break;
 
   default:
+#if dev
     Serial.println(F("Error: invalid ControlState"));
+#endif
     ArduinoOTA.handle();
     delay(1);
   }
