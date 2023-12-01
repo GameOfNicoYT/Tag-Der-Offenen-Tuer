@@ -1,7 +1,3 @@
-        a:hover {
-            text-decoration: underline;
-        }
-
 <h1 style="color:#333">Sensor Board</h1>
 
 <h2 style="color:#333">About This Project</h2>
@@ -20,14 +16,14 @@
     <li><strong>Software Setup</strong>:
         <ul>
             <li>Upload all necessary files to your microcontroller.</li>
-            <li>Update your credentials in the <code>Credentials</code> example file.</li>
+            <li>Update your credentials in the <code><a href="./ESP_Tag_d_Offenen_Tuer/include/_credentials.h">credentials.h</a></code> example file, don't forget to rename _credentials.h to credentials.h!</li>
             <li>We recommend using <a style="color: #007bff; text-decoration:none;" href="https://code.visualstudio.com">VS-Code</a> with the <a style="color: #007bff; text-decoration:none;" href="https://platformio.org">PlatformIO</a> plugin for an efficient development environment.</li>
         </ul>
     </li>
     <li><strong>Web Interface Configuration</strong>:
         <ul>
             <li>Update your HTML page as needed.</li>
-            <li>Upload the <a style="color: #007bff; text-decoration:none;" href="https://github.com/littlefs-project/littlefs">Filesystem</a> for file management.</li>
+            <li>Upload the HTML Files and Pictures to the <a style="color: #007bff; text-decoration:none;" href="https://github.com/littlefs-project/littlefs">Filesystem</a> for file management.</li>
         </ul>
     </li>
 </ol>
