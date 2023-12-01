@@ -1,7 +1,5 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Sensor Board Project</title>
+<body>
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,8 +16,6 @@
             text-decoration: underline;
         }
     </style>
-</head>
-<body>
 
     <h1>Sensor Board</h1>
 
