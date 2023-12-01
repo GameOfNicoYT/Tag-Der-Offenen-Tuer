@@ -48,6 +48,8 @@
 #include "esp_wpa2.h"
 #include "credentials.h"
 
+#define OTA_NAME "NULL"
+#define LED_STATUS 0
 bool messageComplete;
 String incomingMessage;
 
@@ -72,11 +74,14 @@ void readData()
   while (transfare.available() && !messageComplete)
   {
     char inChar = (char)transfare.read();
-    incomingMessage += inChar;
 
     if (inChar == ';')
     {
       messageComplete = true;
+    }
+    if (inChar >= 33 && inChar <= 125)
+    {
+      incomingMessage += inChar;
     }
   }
 
@@ -84,11 +89,11 @@ void readData()
   {
     Serial.println(incomingMessage);
     webSocketService.sendData(incomingMessage);
+
     messageComplete = false;
     incomingMessage = "";
   }
 }
-
 
 AsyncWebServer webServer(80);
 

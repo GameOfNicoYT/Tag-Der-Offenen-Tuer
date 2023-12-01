@@ -23,15 +23,6 @@
   <canvas id="gameCanvas" width="400" height="400"></canvas>
 
   <script>
-    let testData = {
-      poti: { percent: 1, value: 2 },
-      joystick: { x: 504, y: 509 },
-      reset: 0,
-      DHT: { humidity: 47, temperature: 25.4 },
-      Distance: { Distance: "Error" },
-      ldr: { value: 147 },
-      motion: { active: 0 },
-    };
 
     function initWebsocket() {
       const socket = new WebSocket("ws://10.102.101.142:81");

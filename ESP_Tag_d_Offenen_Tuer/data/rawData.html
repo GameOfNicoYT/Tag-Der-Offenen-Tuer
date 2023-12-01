@@ -17,19 +17,13 @@
 
       td,
       th {
+        width: 50%;
         z-index: 2;
         font-size: 1.5rem;
         border: 2px solid black;
         margin: 0;
         padding: 2px;
         text-align: center;
-      }
-
-      td:hover {
-        cursor: pointer;
-        background: rgb(143, 143, 143);
-        transform: translate(-10px, -10px);
-        box-shadow: 3.3px 3.3px #707070, 6.6px 6.6px #024a92, 10px 10px #707070;
       }
 
       .data {
@@ -56,32 +50,7 @@
           <th>Sensor:</th>
           <th>Daten:</th>
         </thead>
-        <tbody id="tablebody" class="tableBody">
-          <tr>
-            <td>Potentiometer</td>
-            <td>${json.poti.percent}% oder ${json.poti.value}/~1024</td>
-          </tr>
-          <tr>
-            <td>Joystick</td>
-            <td>x: ${json.joystick.x} und y: ${json.joystick.y}</td>
-          </tr>
-          <tr>
-            <td>Luftfeuchtigkeit:</td>
-            <td>${json.DHT.humidity}%</td>
-          </tr>
-          <tr>
-            <td>Temperatur:</td>
-            <td>${json.DHT.temperature}°C</td>
-          </tr>
-          <tr>
-            <td>Abstandssensor:</td>
-            <td>~${json.Distance.Distance}cm</td>
-          </tr>
-          <tr>
-            <td>Lichtindex:</td>
-            <td>${1024 - json.ldr.value} /1024</td>
-          </tr>
-        </tbody>
+        <tbody id="tablebody" class="tableBody"></tbody>
       </table>
     </div>
 
